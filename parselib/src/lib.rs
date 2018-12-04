@@ -22,10 +22,7 @@ impl error::Error for ParseError {
 }
 
 pub fn parse_lines<V: FromStr, P: AsRef<Path>>(path: P) -> Result<Vec<V>, ParseError> {
-    let mut f = File::open(path).map_err(|_| ParseError)?;
-
-    let mut input_str = String::new();
-    f.read_to_string(&mut input_str).map_err(|_| ParseError)?;
+    let input_str = load_text_file(path)?;
     let mut result = Vec::new();
     for line in input_str.lines() {
         result.push(line.parse().map_err(|_| ParseError)?);
@@ -33,3 +30,21 @@ pub fn parse_lines<V: FromStr, P: AsRef<Path>>(path: P) -> Result<Vec<V>, ParseE
 
     return Ok(result);
 }
+
+pub fn load_text_file<P: AsRef<Path>>(path: P) -> Result<String, ParseError> {
+    let mut f = File::open(path).map_err(|_| ParseError)?;
+
+    let mut input_str = String::new();
+    f.read_to_string(&mut input_str).map_err(|_| ParseError)?;
+    return Ok(input_str)
+}
+
+pub fn load_bytes<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, ParseError> {
+    let mut f = File::open(path).map_err(|_| ParseError)?;
+
+    let mut result = Vec::new();
+    f.read_to_end(&mut result).map_err(|_| ParseError)?;
+
+    return Ok(result)
+}
+
