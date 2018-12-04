@@ -1,10 +1,9 @@
+use std::error;
 use std::fmt;
 use std::fs::File;
-use std::path::Path;
-use std::error;
 use std::io::Read;
+use std::path::Path;
 use std::str::FromStr;
-
 
 #[derive(Debug, Clone, Copy)]
 pub struct ParseError;
@@ -31,12 +30,25 @@ pub fn parse_lines<V: FromStr, P: AsRef<Path>>(path: P) -> Result<Vec<V>, ParseE
     return Ok(result);
 }
 
+pub fn parse_lines_fn<V, E, P, F>(path: P, mut func: F) -> Result<Vec<V>, ParseError>
+where
+    P: AsRef<Path>,
+    F: FnMut(&str) -> Result<V, E>,
+{
+    let input_str = load_text_file(path)?;
+    let mut result = Vec::new();
+    for line in input_str.lines() {
+        result.push(func(line).map_err(|_| ParseError)?);
+    }
+    return Ok(result);
+}
+
 pub fn load_text_file<P: AsRef<Path>>(path: P) -> Result<String, ParseError> {
     let mut f = File::open(path).map_err(|_| ParseError)?;
 
     let mut input_str = String::new();
     f.read_to_string(&mut input_str).map_err(|_| ParseError)?;
-    return Ok(input_str)
+    return Ok(input_str);
 }
 
 pub fn load_bytes<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, ParseError> {
@@ -45,6 +57,5 @@ pub fn load_bytes<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, ParseError> {
     let mut result = Vec::new();
     f.read_to_end(&mut result).map_err(|_| ParseError)?;
 
-    return Ok(result)
+    return Ok(result);
 }
-

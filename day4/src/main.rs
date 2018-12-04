@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-use std::str::FromStr;
 use regex::Regex;
+use std::collections::HashMap;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd)]
 struct Timestamp {
     month: u8,
     day: u8,
@@ -10,65 +9,59 @@ struct Timestamp {
     minute: u8,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd)]
 enum Event {
     FallAsleep,
     WakeUp,
-    BeginShift(usize)
+    BeginShift(usize),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
-struct LogEntry {
-    time: Timestamp,
-    event: Event
+fn parse_log_entry(s: &str) -> Result<(Timestamp, Event), parselib::ParseError> {
+    lazy_static::lazy_static! {
+        static ref DATE_RE: Regex = Regex::new(r"\[\d+-(\d\d)-(\d\d) (\d\d):(\d\d)\]").unwrap();
+        static ref BEGIN_SHIFT_RE: Regex = Regex::new(r"Guard #(\d+)").unwrap();
+    };
+
+    let date_captures = DATE_RE.captures(s).ok_or(parselib::ParseError)?;
+
+    let event = if let Some(capture) = BEGIN_SHIFT_RE.captures(s) {
+        Event::BeginShift(capture.get(1).unwrap().as_str().parse().unwrap())
+    } else if s.find("falls").is_some() {
+        Event::FallAsleep
+    } else {
+        Event::WakeUp
+    };
+
+    return Ok((
+        Timestamp {
+            month: date_captures.get(1).unwrap().as_str().parse().unwrap(),
+            day: date_captures.get(2).unwrap().as_str().parse().unwrap(),
+            hour: date_captures.get(3).unwrap().as_str().parse().unwrap(),
+            minute: date_captures.get(4).unwrap().as_str().parse().unwrap(),
+        },
+        event,
+    ));
 }
 
-impl FromStr for LogEntry {
-    type Err = parselib::ParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        lazy_static::lazy_static! {
-            static ref DATE_RE: Regex = Regex::new(r"\[\d+-(\d\d)-(\d\d) (\d\d):(\d\d)\]").unwrap();
-            static ref BEGIN_SHIFT_RE: Regex = Regex::new(r"Guard #(\d+)").unwrap();
-        };
-
-        let date_captures = DATE_RE.captures(s).ok_or(parselib::ParseError)?;
-
-        let event = if let Some(capture) = BEGIN_SHIFT_RE.captures(s) {
-            Event::BeginShift(capture.get(1).unwrap().as_str().parse().unwrap())
-        } else if s.find("falls").is_some() {
-            Event::FallAsleep
-        } else {
-            Event::WakeUp
-        };
-
-        return Ok(LogEntry {
-            time: Timestamp {
-                month: date_captures.get(1).unwrap().as_str().parse().unwrap(),
-                day: date_captures.get(2).unwrap().as_str().parse().unwrap(),
-                hour: date_captures.get(3).unwrap().as_str().parse().unwrap(),
-                minute: date_captures.get(4).unwrap().as_str().parse().unwrap(),
-            },
-            event: event
-        });
-    }
-}
-
-fn part12(sorted_entries: &[LogEntry]) -> (usize, usize) {
+fn part12(sorted_entries: &[(Timestamp, Event)]) -> (usize, usize) {
     let mut guard_minutes_asleep = HashMap::new();
     let mut current_guard = 0usize;
     let mut last_event_minute = 0;
     let mut most_minutes = 0;
     let mut most_minutes_guard = 0;
-    for entry in sorted_entries {
-        match entry.event {
-            Event::BeginShift(guard_id) => { current_guard = guard_id; }
+    for (time, event) in sorted_entries {
+        match event {
+            &Event::BeginShift(guard_id) => {
+                current_guard = guard_id;
+            }
             Event::WakeUp => {
-                let (ref mut total_minutes, ref mut per_minute) = guard_minutes_asleep.entry(current_guard).or_insert((0usize, [0usize;60]));
-                for minute in last_event_minute..entry.time.minute {
+                let (ref mut total_minutes, ref mut per_minute) = guard_minutes_asleep
+                    .entry(current_guard)
+                    .or_insert((0usize, [0usize; 60]));
+                for minute in last_event_minute..time.minute {
                     per_minute[minute as usize] += 1;
                 }
-                *total_minutes += (entry.time.minute - last_event_minute) as usize;
+                *total_minutes += (time.minute - last_event_minute) as usize;
                 if *total_minutes > most_minutes {
                     most_minutes = *total_minutes;
                     most_minutes_guard = current_guard;
@@ -76,7 +69,7 @@ fn part12(sorted_entries: &[LogEntry]) -> (usize, usize) {
             }
             Event::FallAsleep => {}
         };
-        last_event_minute = if entry.time.hour != 0 { 0 } else { entry.time.minute };
+        last_event_minute = if time.hour != 0 { 0 } else { time.minute };
     }
 
     let (_, minutes) = guard_minutes_asleep[&most_minutes_guard];
@@ -97,11 +90,15 @@ fn part12(sorted_entries: &[LogEntry]) -> (usize, usize) {
         }
     }
 
-    return (guard_most_asleep_minute * most_minutes_guard, most_asleep_minute * most_asleep_minute_guard);
+    return (
+        guard_most_asleep_minute * most_minutes_guard,
+        most_asleep_minute * most_asleep_minute_guard,
+    );
 }
 
 fn main() {
-    let mut input = parselib::parse_lines::<LogEntry, _>("input.txt").expect("Could not parse input");
+    let mut input =
+        parselib::parse_lines_fn("input.txt", parse_log_entry).expect("Could not parse input");
     input.sort();
     let result = part12(input.as_slice());
     println!("part1: {}", result.0);
