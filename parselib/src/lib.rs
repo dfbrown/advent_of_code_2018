@@ -20,6 +20,28 @@ impl error::Error for ParseError {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct GenericError {
+    message: String,
+}
+
+impl GenericError {
+    pub fn new(message: &str) -> GenericError {
+        GenericError {
+            message: String::from(message)
+        }
+    }
+}
+
+impl fmt::Display for GenericError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Error: {}", self.message)
+    }
+}
+
+impl error::Error for GenericError {
+}
+
 pub fn parse_lines<V: FromStr, P: AsRef<Path>>(path: P) -> Result<Vec<V>, ParseError> {
     let input_str = load_text_file(path)?;
     let mut result = Vec::new();
